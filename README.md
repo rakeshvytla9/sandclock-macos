@@ -4,7 +4,7 @@ A native Mac menu bar countdown with sand moving behind the digits, an animated 
 
 | Menu bar countdown | Hourglass |
 | :---: | :---: |
-| <img src="docs/images/menu-bar.gif" alt="Sand moving behind the countdown digits" width="220"> | <img src="docs/images/hourglass.gif" alt="Hourglass grains falling and settling without an upward splash" width="180"> |
+| <img src="docs/images/menu-bar.gif" alt="Sand moving behind the countdown digits" width="220"> | <img src="docs/images/hourglass.gif" alt="Gently wavy falling sand with a small impact splash" width="180"> |
 
 ## Download
 
@@ -23,7 +23,7 @@ The app has no Dock icon. It does not start automatically after reboot; add it i
 
 - Exact days, hours, minutes, and seconds in the menu bar.
 - Grains enter from the left and settle to the right behind the digits. The text stays on top with a contrasting halo, and the graphic uses the countdown's existing width.
-- Both the menu bar and the hourglass use the same small-column sand model. Neighbouring columns exchange sand when their visual slope is too steep. The hourglass's column capacities follow the curved glass walls. Grains fall and make a small sideways settling movement on impact, with no exaggerated upward bounce.
+- Both the menu bar and the hourglass use the same small-column sand model. Neighbouring columns exchange sand when their visual slope is too steep. The hourglass's column capacities follow the curved glass walls. The falling stream keeps its gentle wavy motion, with a small outward splash where grains land.
 - The visible flow stays near four grains per second. Each grain contributes a smaller fraction of the container on longer countdowns, so the fill reflects the countdown's elapsed percentage and finishes at the deadline.
 - Calendar date picker and separate time control with seconds. The app uses the Mac's current timezone automatically, with no timezone selector. Once saved, the target is an absolute instant: changing timezone changes its displayed local time rather than the countdown's remaining duration.
 - The name field starts empty, stays empty if saved without a name, and has no default motivational text.
@@ -74,7 +74,7 @@ dist/Sandclock.app/Contents/MacOS/Sandclock --render-hourglass dist/hourglass.gi
 
 ## How the sand works
 
-The visible grains follow simple horizontal travel and downward acceleration. The accumulated pile is a height field: incoming volume is deposited into columns, and excessive slopes transfer volume to neighbours. This is a stylized approximation, with slopes chosen for a small display; it does not simulate every grain's collisions, friction, or pressure.
+The visible grains follow simple horizontal travel and downward acceleration, with a small sine-wave offset for visual motion. A few decorative grains make short gravity-shaped arcs at impact, rising about two points before falling back onto the pile. The accumulated pile is a height field: incoming volume is deposited into columns, and excessive slopes transfer volume to neighbours. This is a stylized approximation, with slopes chosen for a small display; it does not simulate every grain's collisions, friction, or pressure. Splash grains decorate the impact without adding extra volume.
 
 Long countdowns scale down the volume represented by each visible grain. Only a small number of airborne and recently landed grains are drawn. Large elapsed-time jumps are reconstructed in bounded batches rather than replaying months of arrivals. Editing a deadline starts a new interval for the sand and progress display.
 

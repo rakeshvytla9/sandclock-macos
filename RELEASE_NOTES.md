@@ -1,4 +1,4 @@
-## Sandclock 1.0.1
+## Sandclock 1.0.2
 
 Native Mac menu bar countdown showing days, hours, minutes, and seconds.
 
@@ -8,7 +8,8 @@ Native Mac menu bar countdown showing days, hours, minutes, and seconds.
 - Percentage-based urgency colours and “Hope you made it.” at completion.
 - Saves settings locally, respects Reduce Motion at launch, and uses no network services.
 - Cached menu bar images refresh with the clock once per second. The larger animation runs at 12 fps only while its popup is visible.
-- Hourglass grains fall and settle sideways, with the exaggerated upward splash removed.
+- Keeps the gently wavy falling stream and the horizontal animation's decorative motion.
+- Restores a small outward impact splash: short gravity-shaped arcs that disappear on reaching the pile, with no extra sand volume.
 - Both the horizontal menu bar effect and the hourglass animation are shown together in the README.
 
 Download the ZIP, unzip it, move Sandclock.app to Applications, and open it. This release is for Apple silicon, targets macOS 13 or later, and is ad-hoc signed rather than Apple-notarized. macOS may require approval under Privacy & Security for the downloaded copy.

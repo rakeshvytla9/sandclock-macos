@@ -349,15 +349,17 @@ final class HourglassView: NSView {
                 grain(NSPoint(x: x, y: y), radius: index % 3 == 0 ? 1.15 : 0.7,
                       opacity: 0.5 + 0.4 * phase)
             }
-            // A few grains slide DOWN the actual surface after impact. There
-            // is no upward launch or decorative ballistic splash.
-            for index in 0..<4 {
-                let phase = (time * 0.75 + Double(index) / 4).truncatingRemainder(dividingBy: 1)
+            // A small stylized impact splash: short outward arcs, then gravity
+            // returns the grains to the pile. Hide them when they touch sand.
+            for index in 0..<6 {
+                let phase = (time * 1.7 + Double(index) / 6).truncatingRemainder(dividingBy: 1)
                 let direction: Double = index % 2 == 0 ? -1 : 1
-                let x = 110 + direction * phase * 5
+                let x = 110 + direction * (0.4 + phase * 6)
                 let column = min(lowerCount - 1, max(0, Int((x - 61) / lowerWidth)))
-                let y = 27 + lowerProfile[column] + 0.3
-                grain(NSPoint(x: x, y: y), radius: 0.55, opacity: (1 - phase) * 0.4)
+                let y = landing + 10 * phase - 12 * phase * phase
+                guard y > 27 + lowerProfile[column] + 0.2 else { continue }
+                grain(NSPoint(x: x, y: y), radius: index % 3 == 0 ? 0.75 : 0.55,
+                      opacity: (1 - phase) * 0.65)
             }
         }
         NSGraphicsContext.restoreGraphicsState()
@@ -995,7 +997,7 @@ if let previewIndex = CommandLine.arguments.firstIndex(where: { ["--render-previ
             ] as CFDictionary)
         }
         precondition(CGImageDestinationFinalize(destination))
-        print("Exported hourglass animation with curved-wall settling and no upward splash.")
+        print("Exported hourglass animation with gentle wavy falling grains and a small impact splash.")
     } else if CommandLine.arguments[previewIndex] == "--render-menubar" {
         let view = SandDigitsView(frame: .zero)
         view.deadline = model
