@@ -27,7 +27,7 @@ The app has no Dock icon. It does not start automatically after reboot; add it i
 - The name field starts empty, stays empty if saved without a name, and has no default motivational text.
 - Gold above 25% remaining, amber above 10% through 25%, and red for the final 10%. At completion the colour returns to gold and the message is **“Hope you made it.”**
 - Deadlines and names are saved locally between launches. The timer catches up from the actual target date after sleep; it stays at zero after completion.
-- The menu bar animation runs at 8 fps. The hourglass runs at 24 fps only while its popup is open. **Reduce Motion** is respected at launch.
+- The menu bar refreshes once per second, matching the clock; the hourglass animates at 12 fps only while its popup is open. **Reduce Motion** is respected at launch. Digits are cached, and the menu bar uses pre-rendered images rather than a continuously animated custom view.
 - No network calls, telemetry, microphone/camera access, or notifications. There is no completion alarm sound.
 
 ![Calendar and time controls](docs/images/calendar.png)
@@ -75,6 +75,6 @@ The visible grains follow simple horizontal travel and downward acceleration. Th
 
 Long countdowns scale down the volume represented by each visible grain. Only a small number of airborne and recently landed grains are drawn. Large elapsed-time jumps are reconstructed in bounded batches rather than replaying months of arrivals. Editing a deadline starts a new interval for the sand and progress display.
 
-No numerical CPU or battery-use claim has been benchmarked. Compatibility across every macOS release and long-duration sleep/wake behaviour have not been exhaustively tested.
+In a short 10-second measurement on one Apple silicon Mac running macOS 27.2, the revised menu-bar-only renderer used about 3.1% of one CPU core. The earlier continuous renderer had been observed near 31%. This is a local measurement with the popup closed, not a battery benchmark or a guarantee for other machines. Compatibility across every macOS release and long-duration sleep/wake behaviour have not been exhaustively tested.
 
 The app's local preferences use `local.sandclock.countdown`. Saved countdown settings are not included in this repository or the release ZIP.

@@ -238,7 +238,7 @@ final class HourglassView: NSView {
 
     func startAnimation() {
         guard animationTimer == nil else { return }
-        let timer = Timer(timeInterval: 1.0 / 24, repeats: true) { [weak self] _ in
+        let timer = Timer(timeInterval: 1.0 / 12, repeats: true) { [weak self] _ in
             self?.needsDisplay = true
         }
         timer.tolerance = 0.008
@@ -438,14 +438,36 @@ final class ProgressView: NSView {
 
 // Grains travel from left to right BEHIND the digits and accumulate on the right.
 // This occupies exactly the countdown's width, with no separate side graphic.
+func rasterImage(size: NSSize, scale: CGFloat = 2, drawing: () -> Void) -> NSImage {
+    let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil,
+        pixelsWide: max(1, Int(ceil(size.width * scale))), pixelsHigh: max(1, Int(ceil(size.height * scale))),
+        bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+        colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    let context = NSGraphicsContext(bitmapImageRep: bitmap)!
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = context
+    context.cgContext.scaleBy(x: scale, y: scale)
+    context.cgContext.clear(NSRect(origin: .zero, size: size))
+    drawing()
+    NSGraphicsContext.restoreGraphicsState()
+    return NSImage(cgImage: bitmap.cgImage!, size: size)
+}
+
 final class SandDigitsView: NSView {
     var deadline: Deadline!
     var previewTime: Double?
     var previewBackground = false
-    var text = "Set a deadline" { didSet { needsDisplay = true } }
+    var text = "Set a deadline"
     let font = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .semibold)
     private var pile: SandPile?
     private var pileStart: Date?
+    private var textImage: NSImage?
+    private var textImageKey = ""
+    func snapshot(scale: CGFloat = 2) -> NSImage {
+        rasterImage(size: bounds.size, scale: scale) {
+            effectiveAppearance.performAsCurrentDrawingAppearance { draw(bounds) }
+        }
+    }
     override func hitTest(_ point: NSPoint) -> NSView? { nil }
     override func draw(_ dirtyRect: NSRect) {
         guard let deadline else { return }
@@ -539,17 +561,24 @@ final class SandDigitsView: NSView {
         }
         NSGraphicsContext.restoreGraphicsState()
         // Text is always drawn LAST, above every grain, with a contrasting halo.
-        let shadow = NSShadow()
-        shadow.shadowColor = (dark ? NSColor.black : NSColor.white).withAlphaComponent(0.9)
-        shadow.shadowBlurRadius = 1.8
-        shadow.shadowOffset = .zero
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: font, .foregroundColor: NSColor.labelColor, .shadow: shadow
-        ]
-        let size = (text as NSString).size(withAttributes: attributes)
-        (text as NSString).draw(at: NSPoint(x: round((bounds.width - size.width) / 2),
-                                          y: round((bounds.height - size.height) / 2)),
-                               withAttributes: attributes)
+        let key = "\(text)|\(dark)|\(bounds.width)|\(bounds.height)"
+        if textImage == nil || textImageKey != key {
+            textImageKey = key
+            textImage = rasterImage(size: bounds.size) {
+                let shadow = NSShadow()
+                shadow.shadowColor = (dark ? NSColor.black : NSColor.white).withAlphaComponent(0.9)
+                shadow.shadowBlurRadius = 1.8
+                shadow.shadowOffset = .zero
+                let attributes: [NSAttributedString.Key: Any] = [
+                    .font: font, .foregroundColor: NSColor.labelColor, .shadow: shadow
+                ]
+                let size = (text as NSString).size(withAttributes: attributes)
+                (text as NSString).draw(at: NSPoint(x: round((bounds.width - size.width) / 2),
+                                                  y: round((bounds.height - size.height) / 2)),
+                                       withAttributes: attributes)
+            }
+        }
+        textImage?.draw(in: bounds, from: .zero, operation: .sourceOver, fraction: 1)
     }
 }
 
@@ -850,7 +879,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     let popover = NSPopover()
     var controller: CountdownController!
     var timer: Timer?
-    var sandTimer: Timer?
     var sandDigits: SandDigitsView?
     var wakeObserver: NSObjectProtocol?
 
@@ -861,15 +889,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
             let digits = SandDigitsView(frame: .zero)
             digits.deadline = deadline
-            digits.setAccessibilityElement(false)
-            digits.translatesAutoresizingMaskIntoConstraints = false
-            button.addSubview(digits)
-            NSLayoutConstraint.activate([
-                digits.leadingAnchor.constraint(equalTo: button.leadingAnchor),
-                digits.trailingAnchor.constraint(equalTo: button.trailingAnchor),
-                digits.topAnchor.constraint(equalTo: button.topAnchor),
-                digits.bottomAnchor.constraint(equalTo: button.bottomAnchor)
-            ])
+            // Keep the standard status button. An animated custom subview makes
+            // macOS repeatedly snapshot its view tree for menu bar replicants.
+            button.imagePosition = .imageOnly
+            button.imageScaling = .scaleNone
             sandDigits = digits
             button.target = self; button.action = #selector(togglePopup)
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
@@ -896,15 +919,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         tick.tolerance = 0.03
         RunLoop.main.add(tick, forMode: .common)
         timer = tick
-        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            let grains = Timer(timeInterval: 0.125, repeats: true) { [weak self] _ in
-                guard let self, (self.deadline.remaining?.total ?? 0) > 0 else { return }
-                self.sandDigits?.needsDisplay = true
-            }
-            grains.tolerance = 0.025
-            RunLoop.main.add(grains, forMode: .common)
-            sandTimer = grains
-        }
         wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
         ) { [weak self] _ in self?.update() }
@@ -927,9 +941,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         sandDigits?.text = text
         let width = (text as NSString).size(withAttributes: [.font: sandDigits!.font]).width
-        statusItem.length = ceil(width) + 4
+        let length = ceil(width) + 4
+        if statusItem.length != length { statusItem.length = length }
         statusItem.button?.setAccessibilityLabel("\(deadline.title.isEmpty ? "Countdown" : deadline.title). \(text). Click to view or edit deadline.")
+        renderStatusFrame()
         if popover.isShown { controller.update() }
+    }
+    private func renderStatusFrame() {
+        guard let button = statusItem.button, let digits = sandDigits else { return }
+        digits.appearance = button.effectiveAppearance
+        digits.frame = NSRect(x: 0, y: 0, width: statusItem.length, height: NSStatusBar.system.thickness)
+        let scale = button.window?.backingScaleFactor ?? 2
+        button.image = digits.snapshot(scale: scale)
     }
     @objc private func togglePopup() {
         if NSApp.currentEvent?.type == .rightMouseUp {
@@ -955,7 +978,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     @objc private func quit() { NSApp.terminate(nil) }
     func popoverDidClose(_ notification: Notification) { controller.hourglass?.stopAnimation() }
     func applicationWillTerminate(_ notification: Notification) {
-        timer?.invalidate(); sandTimer?.invalidate(); controller?.hourglass?.stopAnimation()
+        timer?.invalidate(); controller?.hourglass?.stopAnimation()
         if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
     }
 }
@@ -984,14 +1007,14 @@ if let previewIndex = CommandLine.arguments.firstIndex(where: { ["--render-previ
         view.frame = NSRect(x: 0, y: 0, width: ceil(textWidth) + 4, height: 24)
         let window = NSWindow(contentRect: view.frame, styleMask: .borderless, backing: .buffered, defer: false)
         window.contentView = view
-        let destination = CGImageDestinationCreateWithURL(output as CFURL, UTType.gif.identifier as CFString, 32, nil)!
+        let destination = CGImageDestinationCreateWithURL(output as CFURL, UTType.gif.identifier as CFString, 8, nil)!
         CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
-        for index in 0..<32 {
-            view.previewTime = Double(index) / 8
+        for index in 0..<8 {
+            view.previewTime = Double(index)
             let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
             view.cacheDisplay(in: view.bounds, to: bitmap)
             CGImageDestinationAddImage(destination, bitmap.cgImage!, [
-                kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.125]
+                kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1.0]
             ] as CFDictionary)
         }
         precondition(CGImageDestinationFinalize(destination))
