@@ -2,14 +2,16 @@
 
 A native Mac menu bar countdown with sand moving behind the digits, an animated hourglass, and a calendar for choosing your deadline. Built with Swift and AppKit, with no third-party dependencies or accounts.
 
-![Sand flowing behind the countdown](docs/images/menu-bar.gif)
+| Menu bar countdown | Hourglass |
+| :---: | :---: |
+| <img src="docs/images/menu-bar.gif" alt="Sand moving behind the countdown digits" width="220"> | <img src="docs/images/hourglass.gif" alt="Hourglass grains falling and settling without an upward splash" width="180"> |
 
 ## Download
 
 Get **Sandclock-macOS-arm64.zip** from the [latest release](https://github.com/rakeshvytla9/sandclock-macos/releases/latest).
 
 1. Unzip the download and move **Sandclock.app** to Applications.
-2. Open it. On first launch, choose a date from the calendar and set the time and timezone. The name is optional and starts empty.
+2. Open it. On first launch, choose a date from the calendar and set the time. Your Mac's timezone is used automatically. The name is optional and starts empty.
 3. Click **Start the clock**. The countdown lives in the menu bar, with days, hours, minutes, and seconds.
 4. Click the countdown to open the hourglass or edit the deadline. Right-click it for a compact edit/quit menu.
 
@@ -21,9 +23,9 @@ The app has no Dock icon. It does not start automatically after reboot; add it i
 
 - Exact days, hours, minutes, and seconds in the menu bar.
 - Grains enter from the left and settle to the right behind the digits. The text stays on top with a contrasting halo, and the graphic uses the countdown's existing width.
-- Both the menu bar and the hourglass use the same small-column sand model. Neighbouring columns exchange sand when their visual slope is too steep. The hourglass's column capacities follow the curved glass walls.
+- Both the menu bar and the hourglass use the same small-column sand model. Neighbouring columns exchange sand when their visual slope is too steep. The hourglass's column capacities follow the curved glass walls. Grains fall and make a small sideways settling movement on impact, with no exaggerated upward bounce.
 - The visible flow stays near four grains per second. Each grain contributes a smaller fraction of the container on longer countdowns, so the fill reflects the countdown's elapsed percentage and finishes at the deadline.
-- Calendar date picker, separate time control with seconds, and timezone selection. India time (IST) is selected initially; UTC and the Mac's timezone are available too.
+- Calendar date picker and separate time control with seconds. The app uses the Mac's current timezone automatically, with no timezone selector. Once saved, the target is an absolute instant: changing timezone changes its displayed local time rather than the countdown's remaining duration.
 - The name field starts empty, stays empty if saved without a name, and has no default motivational text.
 - Gold above 25% remaining, amber above 10% through 25%, and red for the final 10%. At completion the colour returns to gold and the message is **“Hope you made it.”**
 - Deadlines and names are saved locally between launches. The timer catches up from the actual target date after sleep; it stays at zero after completion.
@@ -67,6 +69,7 @@ dist/Sandclock.app/Contents/MacOS/Sandclock --render-setup dist/calendar.png
 dist/Sandclock.app/Contents/MacOS/Sandclock --render-preview dist/hourglass.png
 dist/Sandclock.app/Contents/MacOS/Sandclock --render-complete dist/complete.png
 dist/Sandclock.app/Contents/MacOS/Sandclock --render-menubar dist/menu-bar.gif
+dist/Sandclock.app/Contents/MacOS/Sandclock --render-hourglass dist/hourglass.gif
 ```
 
 ## How the sand works

@@ -1,13 +1,15 @@
-## Sandclock 1.0.0
+## Sandclock 1.0.1
 
 Native Mac menu bar countdown showing days, hours, minutes, and seconds.
 
 - Sand flows behind the digits and settles using a column model shared with the curved hourglass.
-- Calendar date picker, separate time control, and timezone selection.
+- Calendar date picker, separate time control, and automatic use of the Mac's timezone.
 - Empty optional name field with no fallback name.
 - Percentage-based urgency colours and “Hope you made it.” at completion.
 - Saves settings locally, respects Reduce Motion at launch, and uses no network services.
 - Cached menu bar images refresh with the clock once per second. The larger animation runs at 12 fps only while its popup is visible.
+- Hourglass grains fall and settle sideways, with the exaggerated upward splash removed.
+- Both the horizontal menu bar effect and the hourglass animation are shown together in the README.
 
 Download the ZIP, unzip it, move Sandclock.app to Applications, and open it. This release is for Apple silicon, targets macOS 13 or later, and is ad-hoc signed rather than Apple-notarized. macOS may require approval under Privacy & Security for the downloaded copy.
 

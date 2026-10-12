@@ -166,7 +166,6 @@ final class Deadline {
     }
     var started: Date { didSet { if persist { defaults.set(started.timeIntervalSince1970, forKey: "started") } } }
     var title: String { didSet { if persist { defaults.set(title, forKey: "title") } } }
-    var timeZoneID: String { didSet { if persist { defaults.set(timeZoneID, forKey: "timeZone") } } }
     init(persist: Bool = true) {
         self.persist = persist
         let stamp = defaults.double(forKey: "target")
@@ -177,9 +176,9 @@ final class Deadline {
         let seededTitle = ["Make it happen", "Make it happen."].contains(storedTitle)
         title = seededTitle ? "" : storedTitle
         if persist && seededTitle { defaults.set("", forKey: "title") }
-        timeZoneID = defaults.string(forKey: "timeZone") ?? "Asia/Kolkata"
+        if persist { defaults.removeObject(forKey: "timeZone") }
     }
-    var timeZone: TimeZone { TimeZone(identifier: timeZoneID) ?? .current }
+    var timeZone: TimeZone { .autoupdatingCurrent }
     var fractionLeft: Double {
         guard let target else { return 0.72 }
         let span = target.timeIntervalSince(started)
@@ -233,6 +232,8 @@ final class HourglassView: NSView {
     var flowing = true
     var animationTimer: Timer?
     let epoch = ProcessInfo.processInfo.systemUptime
+    var previewTime: Double?
+    var previewBackground = false
     private var lowerPile: SandPile?
     override var isOpaque: Bool { false }
 
@@ -255,6 +256,7 @@ final class HourglassView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        if previewBackground { Palette.background.setFill(); bounds.fill() }
         NSGraphicsContext.saveGraphicsState()
         let size = min(bounds.width / 220, bounds.height / 220)
         let transform = NSAffineTransform()
@@ -337,7 +339,7 @@ final class HourglassView: NSView {
                    ending: accent.withAlphaComponent(0.48))!.draw(in: pile, angle: -90)
 
         if flowing && fraction > 0 {
-            let time = ProcessInfo.processInfo.systemUptime - epoch
+            let time = previewTime ?? (ProcessInfo.processInfo.systemUptime - epoch)
             let landing = min(100, 27 + lowerProfile[lowerCount / 2] + 0.5)
             // Falling grains accelerate through the neck.
             for index in 0..<15 {
@@ -347,14 +349,15 @@ final class HourglassView: NSView {
                 grain(NSPoint(x: x, y: y), radius: index % 3 == 0 ? 1.15 : 0.7,
                       opacity: 0.5 + 0.4 * phase)
             }
-            // Tiny ballistic arcs give the landing sand a light, flying scatter.
-            for index in 0..<12 {
-                let phase = (time * 1.1 + Double(index) / 12).truncatingRemainder(dividingBy: 1)
+            // A few grains slide DOWN the actual surface after impact. There
+            // is no upward launch or decorative ballistic splash.
+            for index in 0..<4 {
+                let phase = (time * 0.75 + Double(index) / 4).truncatingRemainder(dividingBy: 1)
                 let direction: Double = index % 2 == 0 ? -1 : 1
-                let spread = 10 + Double(index % 5) * 3
-                let x = 110 + direction * phase * spread
-                let y = landing + 9 * sin(phase * .pi) - phase * spread * 0.30
-                grain(NSPoint(x: x, y: y), radius: 0.75, opacity: (1 - phase) * 0.8)
+                let x = 110 + direction * phase * 5
+                let column = min(lowerCount - 1, max(0, Int((x - 61) / lowerWidth)))
+                let y = 27 + lowerProfile[column] + 0.3
+                grain(NSPoint(x: x, y: y), radius: 0.55, opacity: (1 - phase) * 0.4)
             }
         }
         NSGraphicsContext.restoreGraphicsState()
@@ -584,7 +587,7 @@ final class SandDigitsView: NSView {
 
 final class CountdownController: NSViewController {
     let deadline: Deadline
-    var saveAction: ((String, Date, String) -> Void)?
+    var saveAction: ((String, Date) -> Void)?
     var quitAction: (() -> Void)?
     var closeAction: (() -> Void)?
     var isEditing = false
@@ -602,10 +605,8 @@ final class CountdownController: NSViewController {
     var chosenDayLabel: NSTextField?
     var chosenWeekdayLabel: NSTextField?
     var chosenMonthLabel: NSTextField?
-    var zonePicker: NSPopUpButton?
     var errorLabel: NSTextField?
     var reduceMotion = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-    private var zoneIDs: [String] = []
 
     init(deadline: Deadline) { self.deadline = deadline; super.init(nibName: nil, bundle: nil) }
     required init?(coder: NSCoder) { fatalError() }
@@ -621,7 +622,7 @@ final class CountdownController: NSViewController {
         hourglass?.stopAnimation()
         hourglass = nil; tiles = []; progress = nil
         titleLabel = nil; dateLabel = nil; messageLabel = nil; badgeLabel = nil; progressLabel = nil
-        nameField = nil; datePicker = nil; timePicker = nil; zonePicker = nil; errorLabel = nil
+        nameField = nil; datePicker = nil; timePicker = nil; errorLabel = nil
         chosenDayLabel = nil; chosenWeekdayLabel = nil; chosenMonthLabel = nil
         isEditing = editing
         let root = Backdrop(frame: NSRect(x: 0, y: 0, width: 400, height: editing ? 640 : 620))
@@ -727,18 +728,7 @@ final class CountdownController: NSViewController {
             timePicker = clock
             add(clock, gap: 10)
 
-            let zones = NSPopUpButton()
-            zoneIDs = ["Asia/Kolkata", "UTC"]
-            if !zoneIDs.contains(TimeZone.current.identifier) { zoneIDs.append(TimeZone.current.identifier) }
-            if !zoneIDs.contains(deadline.timeZoneID) { zoneIDs.append(deadline.timeZoneID) }
-            for identifier in zoneIDs {
-                zones.addItem(withTitle: identifier == "Asia/Kolkata" ? "India · IST (UTC +05:30)" :
-                              identifier == "UTC" ? "UTC (UTC +00:00)" : identifier.replacingOccurrences(of: "_", with: " "))
-            }
-            zones.selectItem(at: zoneIDs.firstIndex(of: deadline.timeZoneID) ?? 0)
-            zones.target = self; zones.action = #selector(changeZone)
-            zonePicker = zones
-            add(zones, gap: 8)
+            add(label("Time follows your Mac’s timezone.", size: 11, color: Palette.muted), gap: 8)
             let error = label("", size: 11, color: Palette.red)
             errorLabel = error
             add(error, gap: 14)
@@ -833,12 +823,6 @@ final class CountdownController: NSViewController {
         }
         badgeLabel?.textColor = deadline.phase == .calm ? Palette.muted : deadline.accent
     }
-    @objc private func changeZone() {
-        guard let zonePicker, zoneIDs.indices.contains(zonePicker.indexOfSelectedItem) else { return }
-        datePicker?.timeZone = TimeZone(identifier: zoneIDs[zonePicker.indexOfSelectedItem])
-        timePicker?.timeZone = datePicker?.timeZone
-        updateDateSelection()
-    }
     @objc private func updateDateSelection() {
         guard let picker = datePicker else { return }
         let formatter = DateFormatter()
@@ -848,11 +832,8 @@ final class CountdownController: NSViewController {
         formatter.dateFormat = "MMMM yyyy"; chosenMonthLabel?.stringValue = formatter.string(from: picker.dateValue).uppercased()
     }
     @objc private func save() {
-        guard let picker = datePicker, let clock = timePicker, let zones = zonePicker,
-              zoneIDs.indices.contains(zones.indexOfSelectedItem) else { return }
-        let zoneID = zoneIDs[zones.indexOfSelectedItem]
-        guard let zone = TimeZone(identifier: zoneID),
-              let target = combineDeadline(day: picker.dateValue, time: clock.dateValue, zone: zone) else {
+        guard let picker = datePicker, let clock = timePicker else { return }
+        guard let target = combineDeadline(day: picker.dateValue, time: clock.dateValue, zone: .current) else {
             errorLabel?.stringValue = "Choose a valid time in this timezone."
             return
         }
@@ -862,7 +843,7 @@ final class CountdownController: NSViewController {
             return
         }
         let name = (nameField?.stringValue ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        saveAction?(String(name.prefix(70)), target, zoneID)
+        saveAction?(String(name.prefix(70)), target)
         rebuild(editing: false)
     }
     @objc private func cancelEdit() {
@@ -899,12 +880,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             button.setAccessibilityLabel("Sandclock countdown. Click to view or edit your deadline.")
         }
         controller = CountdownController(deadline: deadline)
-        controller.saveAction = { [weak self] title, date, zone in
+        controller.saveAction = { [weak self] title, date in
             guard let self else { return }
             // Editing a deadline starts a new interval for the sand and progress display.
             self.deadline.started = Date()
             self.deadline.title = title
-            self.deadline.timeZoneID = zone
             self.deadline.target = date
             self.update()
         }
@@ -984,7 +964,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 }
 
 // Small, deterministic checks exercise boundary math without opening a UI.
-if let previewIndex = CommandLine.arguments.firstIndex(where: { ["--render-preview", "--render-setup", "--render-menubar", "--render-complete"].contains($0) }), CommandLine.arguments.count > previewIndex + 1 {
+if let previewIndex = CommandLine.arguments.firstIndex(where: { ["--render-preview", "--render-setup", "--render-menubar", "--render-complete", "--render-hourglass"].contains($0) }), CommandLine.arguments.count > previewIndex + 1 {
     // Export the same native view offscreen; never overwrite the user's deadline.
     let app = NSApplication.shared
     app.appearance = NSAppearance(named: .darkAqua)
@@ -997,7 +977,26 @@ if let previewIndex = CommandLine.arguments.firstIndex(where: { ["--render-previ
         model.target = Date().addingTimeInterval(-1)
     }
     let output = URL(fileURLWithPath: CommandLine.arguments[previewIndex + 1])
-    if CommandLine.arguments[previewIndex] == "--render-menubar" {
+    if CommandLine.arguments[previewIndex] == "--render-hourglass" {
+        let glass = HourglassView(frame: NSRect(x: 0, y: 0, width: 220, height: 220))
+        glass.appearance = NSAppearance(named: .darkAqua)
+        glass.fraction = model.fractionLeft
+        glass.accent = model.accent
+        glass.previewBackground = true
+        let destination = CGImageDestinationCreateWithURL(output as CFURL, UTType.gif.identifier as CFString, 36, nil)!
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        for index in 0..<36 {
+            glass.previewTime = Double(index) / 12
+            let image = rasterImage(size: glass.bounds.size) {
+                glass.effectiveAppearance.performAsCurrentDrawingAppearance { glass.draw(glass.bounds) }
+            }
+            CGImageDestinationAddImage(destination, image.cgImage(forProposedRect: nil, context: nil, hints: nil)!, [
+                kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 1.0 / 12]
+            ] as CFDictionary)
+        }
+        precondition(CGImageDestinationFinalize(destination))
+        print("Exported hourglass animation with curved-wall settling and no upward splash.")
+    } else if CommandLine.arguments[previewIndex] == "--render-menubar" {
         let view = SandDigitsView(frame: .zero)
         view.deadline = model
         view.previewBackground = true
