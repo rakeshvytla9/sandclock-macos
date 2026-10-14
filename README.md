@@ -15,9 +15,25 @@ Get **Sandclock-macOS-arm64.zip** from the [latest release](https://github.com/r
 3. Click **Start the clock**. The countdown lives in the menu bar, with days, hours, minutes, and seconds.
 4. Click the countdown to open the hourglass or edit the deadline. Right-click it for a compact edit/quit menu.
 
-The release targets **Apple silicon Macs with macOS 13 or later**. It is ad-hoc signed and is **not Apple-notarized**. macOS may block the first launch of a downloaded copy; use **System Settings → Privacy & Security → Open Anyway** if that happens. No paid Apple developer account is needed to build or run it locally.
+The release targets **Apple silicon Macs (M1, M2, and later) with macOS 13 or later**. It is ad-hoc signed and is **not Apple-notarized**. No paid Apple developer account is needed to build or run it locally.
 
 The app has no Dock icon. It does not start automatically after reboot; add it in **System Settings → General → Login Items** if you want that.
+
+### If macOS blocks opening Sandclock
+
+After trying to open the app, go to **System Settings → Privacy & Security → Open Anyway** for Sandclock, then confirm **Open**. See [Apple's instructions](https://support.apple.com/en-us/102445).
+
+If **Open Anyway** is missing and you downloaded the app from this repository's release page, move **Sandclock.app** to **Applications**, open **Terminal**, and paste:
+
+```sh
+codesign --verify --deep --strict "/Applications/Sandclock.app" &&
+xattr -dr com.apple.quarantine "/Applications/Sandclock.app" &&
+open "/Applications/Sandclock.app"
+```
+
+This checks the bundle's signature, removes the download quarantine flag for Sandclock only, and opens it. The signature check verifies the bundle's integrity; it does not mean Apple has approved the app. The app remains unnotarized. Each step runs only if the previous step succeeds.
+
+If Terminal reports a signature error, download a fresh copy from the release page. If it says **No such file**, check that the unzipped app is named **Sandclock.app** and is in **Applications**. For other errors, include the exact Terminal output when [reporting the problem](https://github.com/rakeshvytla9/sandclock-macos/issues).
 
 ## Features
 
